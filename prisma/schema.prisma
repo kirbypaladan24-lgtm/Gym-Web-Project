@@ -1,0 +1,287 @@
+// ============================================================================
+// AV Fitness Gym — data model (Phases 2 + 3)
+// ----------------------------------------------------------------------------
+// Mirrors the plan §10 suggested data model. SQLite backend (local-first,
+// zero external services — plan §9 "avoid premature infrastructure"); the
+// schema is plain relational so a later move to Supabase/Postgres is a
+// provider swap, not a redesign.
+//
+// NOTE: Prisma does not support enums on SQLite. Status/role fields are
+// String columns whose allowed values are documented here and enforced by
+// the API layer (src/lib/validation.ts) + TypeScript unions.
+//
+// Public-readable:  branches, branch_hours, announcements (visible+unexpired),
+//                   equipment, branch_equipment, membership_plans (visible),
+//                   tour_scenes.
+// Private (server-only access paths): staff, members, memberships,
+//                   payment_transactions, audit_logs, inquiries.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- staff ----
+// plan §8 — owner + branch-manager roles, §10 staff_roles/staff_branch_access
+model Staff {
+  id           Int         @id @default(autoincrement())
+  email        String      @unique
+  name         String
+  passwordHash String
+  // "OWNER" | "MANAGER" — managers are scoped to one branch (branchId)
+  role         String
+  branchId     Int?
+  branch       Branch?     @relation(fields: [branchId], references: [id])
+  active       Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  verifiedPayments PaymentTransaction[] @relation("VerifiedPayments")
+  auditLogs    AuditLog[]
+
+  @@index([role])
+}
+
+// ------------------------------------------------------------- branches ----
+model Branch {
+  id          Int          @id @default(autoincrement())
+  slug        String       @unique
+  name        String
+  address     String?
+  mapUrl      String?
+  phone       String?
+  summary     String
+  sortOrder   Int          @default(0)
+  // Placeholder confirmation marker (plan §1.2) — stays false until the
+  // owner verifies this branch's facts in the admin.
+  confirmed   Boolean      @default(false)
+  confirmNote String       @default("")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  hours       BranchHours[]
+  announcements Announcement[]
+  memberships Membership[]
+  tourScenes  TourScene[]
+  staff       Staff[]
+  plans       MembershipPlan[]
+  equipment   BranchEquipment[]
+}
+
+model BranchHours {
+  id        Int     @id @default(autoincrement())
+  branchId  Int
+  branch    Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  days      String
+  time      String
+  confirmed Boolean @default(false)
+  sortOrder Int     @default(0)
+
+  @@index([branchId])
+}
+
+// -------------------------------------------------------- announcements ----
+model Announcement {
+  id          Int       @id @default(autoincrement())
+  // "GENERAL" | "BRANCH"
+  scope       String
+  branchId    Int?
+  branch      Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  title       String
+  body        String
+  // Placeholder marker: seeded/staff-draft announcements stay false until
+  // the owner marks the content final (honest-content policy, plan §1.2).
+  confirmed   Boolean   @default(false)
+  visible     Boolean   @default(true)
+  publishedAt DateTime  @default(now())
+  // Expired promotions must stop appearing as current (plan §5.6) — the
+  // public query filters on this.
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([scope, branchId])
+  @@index([visible])
+}
+
+// ------------------------------------------------------------ equipment ----
+model EquipmentCategory {
+  id          Int         @id @default(autoincrement())
+  slug        String      @unique
+  name        String
+  description String
+  sortOrder   Int         @default(0)
+  equipment   Equipment[]
+}
+
+model Equipment {
+  id          Int                @id @default(autoincrement())
+  categoryId  Int
+  category    EquipmentCategory  @relation(fields: [categoryId], references: [id])
+  name        String
+  description String
+  photoUrl    String?
+  // "ACTIVE" | "UNAVAILABLE" — only shown publicly if the gym maintains it
+  status      String             @default("ACTIVE")
+  confirmed   Boolean            @default(false)
+  branches    BranchEquipment[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([categoryId])
+}
+
+// Which equipment exists at which branch — per-branch verification so an
+// item is NEVER shown for a branch it has not been verified at (plan §5.4).
+model BranchEquipment {
+  branchId    Int
+  equipmentId Int
+  confirmed   Boolean @default(false)
+  branch      Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@id([branchId, equipmentId])
+  @@index([equipmentId])
+}
+
+// ----------------------------------------------------- membership plans ----
+model MembershipPlan {
+  id            Int      @id @default(autoincrement())
+  name          String
+  // null = price not confirmed yet — public pages show "To be confirmed"
+  priceCents    Int?
+  currency      String   @default("PHP")
+  // null = duration not confirmed yet
+  durationDays  Int?
+  durationLabel String
+  // "ALL" (both branches) | "SINGLE" (only branchId)
+  eligibility   String   @default("ALL")
+  branchId      Int?
+  branch        Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  // JSON array of inclusion strings (SQLite cannot store lists)
+  inclusions    String   @default("[]")
+  visible       Boolean  @default(true)
+  confirmed     Boolean  @default(false)
+  sortOrder     Int      @default(0)
+  memberships   Membership[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([visible])
+}
+
+// ------------------------------------------------- members & payments ------
+model Member {
+  id          Int          @id @default(autoincrement())
+  fullName    String
+  email       String
+  phone       String
+  notes       String?
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+
+  @@index([email])
+}
+
+model Membership {
+  id        Int      @id @default(autoincrement())
+  // Customer-facing reference, e.g. "AV-7GK2Q4XM" — unguessable capability
+  // key for the public status lookup.
+  reference String   @unique
+  memberId  Int
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  planId    Int
+  plan      MembershipPlan @relation(fields: [planId], references: [id])
+  branchId  Int
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  // "PENDING_PAYMENT" | "PENDING_VERIFICATION" | "ACTIVE" | "EXPIRED" | "CANCELLED"
+  // Transitions (plan §7.3) are enforced in src/lib/membership-states.ts.
+  status    String   @default("PENDING_PAYMENT")
+  startsAt  DateTime?
+  endsAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  transactions PaymentTransaction[]
+
+  @@index([status])
+  @@index([branchId])
+  @@index([memberId])
+}
+
+model PaymentTransaction {
+  id           Int        @id @default(autoincrement())
+  membershipId Int
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  // How the customer says they paid — free text until the gym's actual
+  // methods are confirmed (plan §7.2). e.g. "GCash", "Maya", "Bank transfer".
+  method       String
+  // Customer-submitted provider reference number — verified by staff.
+  providerRef  String
+  amountCents  Int?
+  currency     String     @default("PHP")
+  // "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED" | "FAILED"
+  status       String     @default("PENDING_VERIFICATION")
+  proofNote    String?
+  rejectionReason String?
+  verifiedById Int?
+  verifiedBy   Staff?     @relation("VerifiedPayments", fields: [verifiedById], references: [id])
+  verifiedAt   DateTime?
+  // Double-submission guard: one submission per key (plan §7.4).
+  idempotencyKey String?  @unique
+  submittedAt  DateTime   @default(now())
+
+  @@index([status])
+  @@index([membershipId])
+}
+
+// --------------------------------------------------------- tour scenes ----
+model TourScene {
+  id           Int      @id @default(autoincrement())
+  sceneKey     String   @unique
+  branchId     Int
+  branch       Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  name         String
+  description  String
+  panorama     String
+  initialPitch Float    @default(0)
+  initialYaw   Float    @default(0)
+  hfov         Float    @default(105)
+  // JSON array of hotspots [{id, pitch, yaw, targetSceneId, label}]
+  hotspots     String   @default("[]")
+  // true = neutral sample placeholder, not a real gym photo (plan §6.4)
+  sample       Boolean  @default(true)
+  sortOrder    Int      @default(0)
+}
+
+// ------------------------------------------------- audit & inquiries ------
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  actorId   Int?
+  actor     Staff?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorName String
+  // e.g. "announcement.create", "payment.verify", "membership.register"
+  action    String
+  entity    String
+  entityId  String
+  // JSON object with the action's before/after / reason details
+  details   String   @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+}
+
+model Inquiry {
+  id         Int      @id @default(autoincrement())
+  name       String
+  email      String
+  branchSlug String?
+  message    String
+  handled    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([handled])
+}

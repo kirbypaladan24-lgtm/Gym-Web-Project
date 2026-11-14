@@ -1,0 +1,18 @@
+
+> av-fitness-gym@0.1.0 dev
+> next dev
+
+▲ Next.js 16.4.5 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.10:3000
+✓ Ready in 1169ms
+✓ Running next.config.ts took 110ms
+Creating turbopack project {
+  dir: 'C:\\Users\\user\\OneDrive\\Documents\\AVfitnessGYM',
+  testMode: true
+}
+
+  Turbopack has seen frequent file updates and is waiting for the filesystem to settle (0.5s elapsed so far; last modified: "\\\\?\\C:\\Users\\user\\OneDrive\\Documents\\AVfitnessGYM\\node_modules\\next\\dist\\lib\\metadata\\generate").
+ GET / 200 in 726ms (next.js: 248ms, application-code: 479ms)
+ GET / 200 in 129ms (next.js: 4ms, application-code: 125ms)
+[?25h

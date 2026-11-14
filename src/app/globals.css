@@ -1,0 +1,615 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   AV FITNESS GYM — design tokens
+   Palette, type roles, motion, and elevation follow the brand direction in
+   .plan/AV-Fitness-Gym-Website-Build-Plan.md §3 (Brand and Visual Direction)
+   and the approved captions document (brand personality: modern, comfortable,
+   premium, welcoming, confident).
+
+   PHASE 1 skills: agency-grid-layout-minimal (type + label system),
+   animation-systems (motion tokens), animation-on-scroll (reveal keyframes),
+   beautiful-shadows (elevation utilities), atmosphere-background (hero layer),
+   no-ai-design-slop (passive quality gate).
+
+   PREMIUM SHINE PASS — owner direction: "modern, shiny, scream premium".
+   Skills added: build-awwwards-quality-sites (hero as authored moment,
+   quality bar), beam-glow-states (traveling light edge, implemented as pure
+   CSS conic beam — no new dependencies), ambient-section-particles (hero
+   light-dust canvas), atmosphere-background (enriched folds + key light).
+   Shine stays in the brand family: silver/platinum metallics, blue-gray
+   light, restrained ember. Never neon (plan §3.1).
+   ============================================================================ */
+
+@theme {
+  /* Brand palette — from the build plan (§3.2 suggested color tokens) */
+  /* Owner direction (2026-11-07): the site-wide background is PLAIN DARK
+     GRAY — flat and neutral, no blue cast. The former blue-tinted charcoal
+     family is retired; only the light-effect layers (atmosphere, dust,
+     pointer light) keep their cool platinum notes. */
+  --color-charcoal: #262626; /* neutral charcoal — raised panel surface */
+  --color-bluegray: #2c2c2c; /* flat dark gray — legacy gradient partner */
+  --color-deep: #1c1c1c; /* plain dark gray — the site-wide background */
+  --color-ink: #121212; /* near black — strong contrast */
+  --color-bone: #f4f4f4; /* soft white — primary text on dark */
+  --color-silver: #b8bec6; /* subtle emphasis + dividers */
+  --color-muted: #858b94; /* secondary text */
+  --color-ember: #b8323c; /* restrained red — key actions/status only */
+  --color-ember-bright: #c93c47; /* ember hover state — same hue, slightly lifted */
+
+  --color-surface: #202020; /* card surface — one step above the page bg */
+  --color-surface-2: #272727; /* raised surface (selected states, card tops) */
+  --color-line: #2e2e2e; /* hairline borders on dark */
+  --color-line-strong: #3e3e3e;
+
+  /* Platinum ramp — the metallic shine family (premium pass).
+     Silver-white highlights over cool gray, like brushed metal catching
+     light. Used only for gradient text and light edges, never surfaces. */
+  --color-platinum-100: #ffffff;
+  --color-platinum-200: #e8ecf1;
+  --color-platinum-300: #cfd6de;
+  --color-platinum-400: #b8bec6;
+  --color-platinum-500: #9aa2ad;
+  --color-platinum-600: #7d8590;
+
+  /* Typography — a single, highly legible sans family (plan §3.4).
+     Inter variable is loaded in app/layout.tsx via next/font. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Arial, sans-serif;
+
+  /* Motion tokens (animation-systems): few, reused, physical */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1); /* expo-out feel */
+  --duration-micro: 150ms; /* hover / press */
+  --duration-state: 250ms; /* toggles, menu */
+  --duration-reveal: 640ms; /* section entrances */
+
+  /* Editorial radii — crisp, architectural, not pill-shaped */
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------------- */
+
+/* Note: no `html { scroll-behavior: smooth }` — Lenis is the site's sole
+   smooth-scroll engine (see the Lenis block below). Native smooth would
+   stack a second animation on top of Lenis's per-frame scroll updates.
+   Without Lenis (reduced motion / no JS) jumps are instant, which is the
+   correct behavior for both. */
+
+body {
+  background-color: var(--color-deep);
+  color: var(--color-bone);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-ember);
+  color: var(--color-bone);
+}
+
+/* Quiet utility label — the smallest voice in the hierarchy
+   (agency-grid-layout-minimal: quiet uppercase metadata) */
+@utility label-utility {
+  font-size: 0.6875rem; /* 11px */
+  line-height: 1;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+/* Display heading treatment — oversized, tight, calm */
+@utility heading-display {
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+/* ---------------------------------------------------------------------------
+   PREMIUM SHINE — metallic text
+   Chrome-platinum gradient text with a slow traveling light band.
+   build-awwwards-quality-sites: the hero headline is the site's signature;
+   beam-glow-states inspires the traveling light. Text stays real DOM text
+   (accessible name preserved), only the fill is a gradient.
+   --------------------------------------------------------------------------- */
+
+@utility text-metallic {
+  background-image: linear-gradient(
+    104deg,
+    #828a96 0%,
+    #b8bec6 14%,
+    #e8ecf1 27%,
+    #ffffff 36%,
+    #e8ecf1 44%,
+    #9aa2ad 58%,
+    #cfd6de 72%,
+    #f4f6f9 84%,
+    #8d95a1 100%
+  );
+  background-size: 240% 100%;
+  background-position: 0% 0%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: metal-sweep 8s linear infinite alternate;
+  /* Fallback: if background-clip:text is unsupported the text keeps a
+     readable silver fill instead of disappearing. */
+  @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+    background-image: none;
+    color: var(--color-silver);
+  }
+}
+
+/* Same platinum fill, no motion — for section headings and prices. */
+@utility text-metallic-static {
+  background-image: linear-gradient(
+    104deg,
+    #8d95a1 0%,
+    #cfd6de 22%,
+    #ffffff 40%,
+    #d7dce3 55%,
+    #9aa2ad 72%,
+    #cfd6de 88%,
+    #8d95a1 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+    background-image: none;
+    color: var(--color-silver);
+  }
+}
+
+@keyframes metal-sweep {
+  from {
+    background-position: 0% 0%;
+  }
+  to {
+    background-position: 100% 0%;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   PREMIUM SHINE — glossy buttons
+   beautiful-shadows elevation logic applied to controls: a 1px inset light
+   along the top edge reads as a polished material cap; the hover sheen is a
+   diagonal light band sweeping across (beam-glow-states visual language).
+   --------------------------------------------------------------------------- */
+
+@utility btn-gloss-ember {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  color: var(--color-bone);
+  background-image: linear-gradient(
+    180deg,
+    #c4404b 0%,
+    #b8323c 52%,
+    #9c2832 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.32),
+    0 10px 28px -10px rgba(184, 50, 60, 0.6),
+    0 2px 6px -2px rgba(0, 0, 0, 0.4);
+  transition:
+    transform var(--duration-micro) var(--ease-out-soft),
+    box-shadow var(--duration-micro) var(--ease-out-soft),
+    filter var(--duration-micro) var(--ease-out-soft);
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(
+      105deg,
+      transparent 38%,
+      rgba(255, 255, 255, 0.1) 46%,
+      rgba(255, 255, 255, 0.28) 50%,
+      rgba(255, 255, 255, 0.1) 54%,
+      transparent 62%
+    );
+    transform: translateX(-130%) skewX(-8deg);
+    transition: transform 850ms var(--ease-out-soft);
+    pointer-events: none;
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.06);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.28),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.32),
+      0 16px 36px -10px rgba(184, 50, 60, 0.7),
+      0 3px 8px -2px rgba(0, 0, 0, 0.45);
+  }
+
+  &:hover::after,
+  &:focus-visible::after {
+    transform: translateX(130%) skewX(-8deg);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+@utility btn-gloss-ghost {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  color: var(--color-bone);
+  border: 1px solid var(--color-line-strong);
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.015) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 6px 18px -10px rgba(0, 0, 0, 0.55);
+  transition:
+    transform var(--duration-micro) var(--ease-out-soft),
+    border-color var(--duration-micro) var(--ease-out-soft),
+    box-shadow var(--duration-micro) var(--ease-out-soft);
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(
+      105deg,
+      transparent 40%,
+      rgba(232, 236, 241, 0.09) 47%,
+      rgba(232, 236, 241, 0.2) 50%,
+      rgba(232, 236, 241, 0.09) 53%,
+      transparent 60%
+    );
+    transform: translateX(-130%) skewX(-8deg);
+    transition: transform 850ms var(--ease-out-soft);
+    pointer-events: none;
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-silver);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 12px 26px -12px rgba(0, 0, 0, 0.65);
+  }
+
+  &:hover::after,
+  &:focus-visible::after {
+    transform: translateX(130%) skewX(-8deg);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   PREMIUM SHINE — glossy card surface
+   A dark surface with a faint top-edge light: reads as lacquered material
+   (beautiful-shadows: one elevation level, neutral, layered).
+   --------------------------------------------------------------------------- */
+
+@utility card-gloss {
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.045) 0%,
+      rgba(255, 255, 255, 0.012) 28%,
+      rgba(255, 255, 255, 0) 55%
+    ),
+    linear-gradient(180deg, var(--color-surface-2) 0%, var(--color-surface) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.018);
+}
+
+/* Light sweep across a card on hover — one quiet diagonal band. */
+@utility sheen-hover {
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 40%,
+      rgba(232, 236, 241, 0.05) 46%,
+      rgba(255, 255, 255, 0.13) 50%,
+      rgba(232, 236, 241, 0.05) 54%,
+      transparent 60%
+    );
+    transform: translateX(-130%) skewX(-8deg);
+    transition: transform 900ms var(--ease-out-soft);
+    pointer-events: none;
+  }
+
+  &:hover::after,
+  &:focus-visible::after {
+    transform: translateX(130%) skewX(-8deg);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   PREMIUM SHINE — traveling border beam
+   beam-glow-states visual language (selected/current surfaces) implemented
+   as pure CSS: a bright platinum comet orbiting the card's border via a
+   rotating conic gradient masked to a 1px ring. Progressive enhancement —
+   without @property support the ring simply stays static.
+   --------------------------------------------------------------------------- */
+
+@property --beam-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@utility beam-card {
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(
+      from var(--beam-angle),
+      transparent 0deg,
+      transparent 295deg,
+      rgba(184, 190, 198, 0.05) 315deg,
+      rgba(232, 236, 241, 0.75) 337deg,
+      #ffffff 346deg,
+      rgba(232, 236, 241, 0.75) 355deg,
+      transparent 360deg
+    );
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    animation: beam-rotate 4.6s linear infinite;
+    pointer-events: none;
+  }
+}
+
+@keyframes beam-rotate {
+  to {
+    --beam-angle: 360deg;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   PREMIUM SHINE — luminous hairline divider
+   A hairline that carries a soft center bloom, like light under a door.
+   --------------------------------------------------------------------------- */
+
+@utility hairline-glow {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(42, 46, 53, 0.9) 0%,
+    rgba(184, 190, 198, 0.42) 28%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(184, 190, 198, 0.42) 72%,
+    rgba(42, 46, 53, 0.9) 100%
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   PREMIUM SHINE — filmic grain
+   One near-invisible noise layer over the whole page: kills banding on the
+   dark gradients and adds cinema texture. Non-interactive, decorative only.
+   --------------------------------------------------------------------------- */
+
+@utility noise-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 39; /* above content, below the fixed header (z-50) */
+  pointer-events: none;
+  opacity: 0.032;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+}
+
+/* ---------------------------------------------------------------------------
+   Reveal-on-scroll — exact pattern from the animation-on-scroll skill:
+   keyframes + paused/running states + IntersectionObserver in <Reveal/>.
+   --------------------------------------------------------------------------- */
+
+@keyframes reveal-in {
+  0% {
+    opacity: 0;
+    transform: translateY(26px);
+    filter: blur(7px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.reveal-on-scroll {
+  animation: reveal-in var(--duration-reveal) var(--ease-out-soft) both;
+  animation-play-state: paused !important;
+}
+.reveal-on-scroll.reveal-in {
+  animation-play-state: running !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Lenis smooth scroll — recommended base styles (the engine adds these
+   classes to <html> itself). Lenis is the site's sole smooth-scroll
+   library; under prefers-reduced-motion it never initializes, so native
+   scrolling stays untouched.
+   --------------------------------------------------------------------------- */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
+   COOL PASS — marquee ribbon, ghost outline type
+   Owner direction: "the website looks so boring make it cooler". The levers
+   are photography, rhythm, and oversized type — never the removed effects
+   (no particles, no pointer light, no moving light lines, no blue cast).
+   --------------------------------------------------------------------------- */
+
+/* Slow horizontal ticker: the track holds two identical copies and loops
+   at exactly -50% for a seamless marquee. Pure CSS; pauses on hover. */
+@keyframes marquee-x {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@utility marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-x 46s linear infinite;
+}
+@utility marquee-fade {
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+}
+
+/* Ghost outline display type — huge numerals and wordmarks. Stroke only,
+   no fill: sits behind content like frosted glass etching. Falls back to
+   a faint silver fill where -webkit-text-stroke is unsupported. */
+@utility text-outline {
+  color: var(--color-silver);
+  -webkit-text-stroke: 0;
+  @supports (-webkit-text-stroke: 1px #fff) {
+    color: transparent;
+    -webkit-text-stroke: 1.5px rgba(184, 190, 198, 0.34);
+  }
+}
+@utility text-outline-faint {
+  color: rgba(184, 190, 198, 0.1);
+  -webkit-text-stroke: 0;
+  @supports (-webkit-text-stroke: 1px #fff) {
+    color: transparent;
+    -webkit-text-stroke: 1.5px rgba(184, 190, 198, 0.15);
+  }
+}
+
+/* Reduced motion (animation-systems): render final states immediately.
+   Every premium-pass animation is decorative, so all of them stop. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal-on-scroll {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+  .atmosphere-fallback {
+    animation: none !important;
+  }
+  .text-metallic {
+    animation: none !important;
+  }
+  .beam-card::before {
+    animation: none !important;
+    opacity: 0.5;
+  }
+  .btn-gloss-ember::after,
+  .btn-gloss-ghost::after,
+  .sheen-hover::after {
+    display: none;
+  }
+  .marquee-track {
+    animation: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Elevation — exact utilities from the beautiful-shadows skill
+   (neutral, layered; adapted surfaces stay dark).
+   --------------------------------------------------------------------------- */
+
+@utility shadow-beautiful-sm {
+  box-shadow: 0px 2px 3px -1px rgba(0, 0, 0, 0.1),
+    0px 1px 0px 0px rgba(0, 0, 0, 0.4), 0px 0px 0px 1px rgba(0, 0, 0, 0.35);
+}
+
+@utility shadow-beautiful-md {
+  box-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.35), 0px 1px 1px -0.5px rgba(0, 0, 0, 0.2),
+    0px 3px 3px -1.5px rgba(0, 0, 0, 0.2), 0px 6px 6px -3px rgba(0, 0, 0, 0.2),
+    0px 12px 12px -6px rgba(0, 0, 0, 0.25), 0px 24px 24px -12px rgba(0, 0, 0, 0.3);
+}
+
+@utility shadow-beautiful-lg {
+  box-shadow: 0 2.8px 2.2px rgba(0, 0, 0, 0.15), 0 6.7px 5.3px rgba(0, 0, 0, 0.17),
+    0 12.5px 10px rgba(0, 0, 0, 0.19), 0 22.3px 17.9px rgba(0, 0, 0, 0.21),
+    0 41.8px 33.4px rgba(0, 0, 0, 0.23), 0 100px 80px rgba(0, 0, 0, 0.28);
+}
+
+/* ---------------------------------------------------------------------------
+   Small helpers
+   --------------------------------------------------------------------------- */
+
+/* Focus visibility (accessibility plan §11) */
+:focus-visible {
+  outline: 2px solid var(--color-silver);
+  outline-offset: 2px;
+}
+
+/* Raised brand panel — formerly a charcoal→blue-gray gradient. Owner
+   direction (2026-11-07): plain flat dark-gray surfaces; the gradient is
+   retired so every large panel reads as one calm plain gray. Kept as a
+   utility so existing sections keep their raised-panel role unchanged. */
+@utility surface-brand-gradient {
+  background-color: var(--color-charcoal);
+}
+
+/* Dashed confirmation marker for placeholder business facts (plan §1.2) */
+@utility tag-unconfirmed {
+  border: 1px dashed var(--color-line-strong);
+  color: var(--color-muted);
+}
+
+/* Thin horizontal rule with a touch of depth */
+@utility hairline {
+  border-color: var(--color-line);
+}
+
+
